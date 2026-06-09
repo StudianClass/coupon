@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>쿠폰 받기</title>
+<style>
+  /* ============================================================
+     설정(CONFIG) — 여기 두 곳만 바꾸면 됩니다.
+     1) registerUrl : 쿠폰을 등록하는 페이지 주소(붙여넣기 팝업이 있는 곳)
+     2) brandName   : 표시할 브랜드명
+     쿠폰번호는 URL의 ?code= 값에서 자동으로 읽어옵니다.
+     예) https://내도메인/coupon.html?code=ABC123XYZ456
+     ============================================================ */
+
+  :root{
+    --paper:#F4F2EC;
+    --card:#FFFFFF;
+    --ink:#15233B;
+    --ink-soft:#5A6675;
+    --gold:#C8962F;
+    --gold-deep:#A87A1E;
+    --line:#E3DFD4;
+    --ok:#1F8A5B;
+    --radius:18px;
+    --shadow:0 10px 30px rgba(21,35,59,.10);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    min-height:100dvh;
+    display:flex;align-items:center;justify-content:center;
+    padding:24px 18px calc(24px + env(safe-area-inset-bottom));
+    line-height:1.55;
+  }
+  .wrap{width:100%;max-width:420px}
+
+  .eyebrow{
+    text-align:center;font-size:13px;letter-spacing:.14em;
+    color:var(--gold-deep);font-weight:700;margin:0 0 6px;
+    text-transform:uppercase;
+  }
+  h1{
+    text-align:center;font-size:24px;font-weight:800;
+    margin:0 0 4px;letter-spacing:-.01em;
+  }
+  .sub{
+    text-align:center;color:var(--ink-soft);font-size:14px;margin:0 0 22px;
+  }
+
+  /* ── 티켓(쿠폰) 카드: 시그니처 요소 ── */
+  .ticket{
+    position:relative;background:var(--card);border-radius:var(--radius);
+    box-shadow:var(--shadow);overflow:hidden;
+  }
+  .ticket__top{padding:26px 22px 22px;text-align:center}
+  .ticket__label{
+    font-size:12px;letter-spacing:.12em;color:var(--ink-soft);
+    font-weight:700;margin:0 0 12px;
+  }
+  .code{
+    font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    font-size:clamp(22px,7.4vw,30px);font-weight:700;letter-spacing:.06em;
+    color:var(--ink);word-break:break-all;
+    user-select:all;-webkit-user-select:all;  /* 폴백: 길게 눌러 선택 가능 */
+    padding:6px 0;
+  }
+  .code--empty{font-size:16px;color:var(--ink-soft);font-family:inherit;letter-spacing:normal}
+
+  /* 점선 절취선 + 양옆 반원 노치 */
+  .perf{position:relative;height:0;border-top:2px dashed var(--line);margin:0 22px}
+  .perf::before,.perf::after{
+    content:"";position:absolute;top:-12px;width:24px;height:24px;
+    background:var(--paper);border-radius:50%;
+  }
+  .perf::before{left:-34px}
+  .perf::after{right:-34px}
+
+  .ticket__bottom{padding:22px}
+
+  .btn{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    width:100%;border:none;border-radius:12px;cursor:pointer;
+    font-size:16px;font-weight:700;padding:16px;text-decoration:none;
+    font-family:inherit;transition:transform .08s ease,background .15s ease;
+  }
+  .btn:active{transform:scale(.985)}
+  .btn--copy{background:var(--gold);color:#fff}
+  .btn--copy.is-done{background:var(--ok)}
+  .btn--go{background:var(--ink);color:#fff;margin-top:10px}
+  .btn--ghost{
+    background:transparent;color:var(--ink-soft);
+    border:1px solid var(--line);margin-top:10px;font-weight:600;font-size:14px;
+  }
+
+  .steps{
+    list-style:none;padding:0;margin:18px 4px 0;
+    color:var(--ink-soft);font-size:13.5px;
+  }
+  .steps li{display:flex;gap:9px;align-items:flex-start;margin-bottom:7px}
+  .steps .n{
+    flex:0 0 auto;width:19px;height:19px;border-radius:50%;
+    background:var(--ink);color:#fff;font-size:11px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;margin-top:1px;
+  }
+  .note{
+    text-align:center;color:var(--ink-soft);font-size:12px;
+    margin:16px 8px 0;line-height:1.5;
+  }
+
+  /* 복사 완료 토스트 */
+  .toast{
+    position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;padding:11px 18px;border-radius:999px;
+    font-size:13.5px;font-weight:600;opacity:0;pointer-events:none;
+    transition:opacity .2s ease,transform .2s ease;z-index:10;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  @media (prefers-reduced-motion:reduce){
+    .btn,.toast{transition:none}
+  }
+</style>
+</head>
+<body>
+  <main class="wrap">
+    <p class="eyebrow">CHALLENGE REWARD</p>
+    <h1>완주를 축하드려요 🎉</h1>
+    <p class="sub">약속드린 할인 쿠폰을 보내드립니다.</p>
+
+    <section class="ticket">
+      <div class="ticket__top">
+        <p class="ticket__label">쿠폰번호</p>
+        <div class="code" id="code">불러오는 중…</div>
+      </div>
+
+      <div class="perf"></div>
+
+      <div class="ticket__bottom">
+        <button class="btn btn--copy" id="copyBtn">쿠폰번호 복사</button>
+        <a class="btn btn--go" id="goBtn" href="#">등록 페이지로 이동</a>
+        <button class="btn btn--ghost" id="giftBtn">친구에게 선물하기 (링크 복사)</button>
+
+        <ol class="steps">
+          <li><span class="n">1</span><span><b>쿠폰번호 복사</b>를 누르세요.</span></li>
+          <li><span class="n">2</span><span><b>등록 페이지로 이동</b> 후 번호 칸에 붙여넣으면 끝!</span></li>
+        </ol>
+      </div>
+    </section>
+
+    <p class="note">
+      복사가 안 되면 위 번호를 <b>길게 눌러</b> 직접 선택할 수 있어요.<br>
+      쿠폰은 1회용이며, 선물 링크는 먼저 등록한 사람에게 적용됩니다.
+    </p>
+  </main>
+
+  <div class="toast" id="toast">복사됐어요 ✓</div>
+
+<script>
+  /* ===================== 설정 ===================== */
+  const CONFIG = {
+    registerUrl: "https://example.com/register",  // ← 쿠폰 등록(붙여넣기 팝업) 페이지 주소로 교체
+    brandName:   "상상스퀘어"
+  };
+  /* =============================================== */
+
+  // URL ?code= 에서 쿠폰번호 읽기 (대문자 통일, 공백 제거)
+  const params  = new URLSearchParams(location.search);
+  const rawCode = (params.get("code") || "").trim().toUpperCase().replace(/\s+/g,"");
+
+  const codeEl = document.getElementById("code");
+  const copyBtn = document.getElementById("copyBtn");
+  const goBtn  = document.getElementById("goBtn");
+  const giftBtn = document.getElementById("giftBtn");
+  const toast  = document.getElementById("toast");
+
+  // 보기 좋게 4자리씩 끊어서 표시(복사·붙여넣기는 원본 그대로)
+  function pretty(c){ return c.replace(/(.{4})/g,"$1 ").trim(); }
+
+  if(rawCode){
+    codeEl.textContent = pretty(rawCode);
+  }else{
+    codeEl.textContent = "쿠폰번호를 확인할 수 없어요";
+    codeEl.classList.add("code--empty");
+    copyBtn.disabled = true;
+    copyBtn.style.opacity = ".5";
+  }
+  goBtn.href = CONFIG.registerUrl;
+
+  // 토스트
+  let toastTimer;
+  function showToast(msg){
+    toast.textContent = msg;
+    toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>toast.classList.remove("show"), 1800);
+  }
+
+  // 3단 폴백 복사
+  async function copyText(text){
+    try{
+      if(navigator.clipboard && window.isSecureContext){
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    }catch(e){ /* 인앱 브라우저에서 막힌 경우 → 아래 폴백 */ }
+    try{
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly","");
+      ta.style.position="fixed"; ta.style.top="0"; ta.style.left="0"; ta.style.opacity="0";
+      document.body.appendChild(ta);
+      ta.focus(); ta.select(); ta.setSelectionRange(0, text.length);
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    }catch(e){ return false; }
+  }
+
+  copyBtn.addEventListener("click", async ()=>{
+    if(!rawCode) return;
+    const ok = await copyText(rawCode);  // 원본(대시 없는 12자리) 복사
+    if(ok){
+      copyBtn.textContent = "복사됨 ✓";
+      copyBtn.classList.add("is-done");
+      showToast("쿠폰번호가 복사됐어요 ✓");
+      setTimeout(()=>{ copyBtn.textContent="쿠폰번호 복사"; copyBtn.classList.remove("is-done"); }, 2200);
+    }else{
+      showToast("번호를 길게 눌러 복사해 주세요");
+    }
+  });
+
+  giftBtn.addEventListener("click", async ()=>{
+    const ok = await copyText(location.href);  // 현재 쿠폰 링크 복사 → 카톡으로 전달
+    showToast(ok ? "선물 링크가 복사됐어요. 카톡에 붙여넣기 하세요 🎁" : "링크 복사에 실패했어요");
+  });
+</script>
+</body>
+</html>
