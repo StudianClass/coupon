@@ -190,8 +190,7 @@
   const timeEl  = document.getElementById("time");
   const countEl = document.getElementById("count");
 
-  const pretty = c => c.replace(/(.{4})/g,"$1 ").trim();
-  codeEl.textContent = rawCode ? pretty(rawCode) : "쿠폰번호 없음";
+  codeEl.textContent = rawCode || "쿠폰번호 없음";   // 공백 없이 그대로 표시(직접 선택 복사도 깔끔)
   goBtn.href = CONFIG.registerUrl;
 
   const DEADLINE = new Date(CONFIG.deadlineISO).getTime();
