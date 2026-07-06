@@ -213,7 +213,7 @@
     let diff = DEADLINE - Date.now();
     if(diff <= 0){
       countEl.classList.add("is-over");
-      timeEl.textContent = "유효기간이 종료되었어요";
+      timeEl.textContent = "스터디언 클래스 인강에서 만나요!";
       countEl.querySelector(".lbl").style.display = "none";
       clearInterval(timer); return;
     }
