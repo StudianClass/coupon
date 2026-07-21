@@ -8,11 +8,13 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
   /* =====================================================================
-     설정은 맨 아래 <script>의 CONFIG 객체에서 변경.
-     - registerUrl : "마이페이지에서 쿠폰 등록하기" 버튼 이동 주소
-     - deadlineISO : 유효기간(한국시간 고정)
-     - defaultCode : ?code= 없을 때 샘플
-     쿠폰번호는 URL ?code= 값에서 읽고, 복사 시 공백 없이 12자리 그대로 복사.
+     ★ 매달 운영 시 이 파일은 수정할 필요 없음 ★
+     - 쿠폰번호 : URL ?code= 값
+     - 유효기간 : URL ?exp= 값 (예: ?exp=20260805 또는 ?exp=2026-08-05)
+                  → 해당 날짜의 한국시간(KST) 23:59:59까지로 자동 계산
+     - ?exp= 가 없거나 형식이 틀리면 아래 CONFIG.deadlineISO 를 사용(안전장치)
+     알림톡 링크 예시:
+       https://studianclass.github.io/coupon/?code=ABCD12345678&exp=20260805
      ===================================================================== */
   :root{
     --navy:#1C2340;
@@ -109,7 +111,9 @@
   }
   .count .lbl{font-size:12.5px;color:var(--muted);font-weight:700}
   .count .time{font-weight:800;font-size:clamp(15px,4.4vw,18px);color:var(--purple-deep);font-variant-numeric:tabular-nums;letter-spacing:.01em}
+  .count .until{flex-basis:100%;text-align:center;font-size:12px;color:var(--muted);font-weight:700;margin-top:2px}
   .count.is-over .time{color:var(--danger);font-size:14px}
+  .count.is-over .until{display:none}
 
   .note{text-align:center;color:var(--muted);font-size:12px;font-weight:500;margin:12px 6px 0;line-height:1.6}
 
@@ -160,6 +164,7 @@
     <div class="count" id="count">
       <span class="lbl">남은 시간</span>
       <span class="time" id="time">계산 중…</span>
+      <span class="until" id="until"></span>
     </div>
 
     <p class="note">
@@ -174,7 +179,7 @@
   /* ===================== 설정 ===================== */
   const CONFIG = {
     registerUrl: "https://www.studianclass.com/sub/myPage/goCouponUserList",   // 마이페이지(쿠폰 등록)
-    deadlineISO: "2026-07-05T23:59:59+09:00",                                  // 유효기간(한국시간 고정)
+    deadlineISO: "2026-08-05T23:59:59+09:00",                                  // ?exp= 없을 때 기본 유효기간(KST)
     defaultCode: "TEST12341234",                                               // ?code= 없을 때 샘플
     logUrl: "https://script.google.com/macros/s/AKfycbwSkLvK5sfo6O3BDzdfMuWcEHzuMxV6q5Y2RKk66uhgZPz5QOvlaohjOHX8iJonOObb/exec"   // 클릭 기록(구글 시트)
   };
@@ -182,6 +187,25 @@
 
   const params  = new URLSearchParams(location.search);
   const rawCode = ((params.get("code") || CONFIG.defaultCode) || "").trim().toUpperCase().replace(/\s+/g,"");
+
+  /* ── 유효기간: ?exp=YYYYMMDD 또는 YYYY-MM-DD → KST 23:59:59 ── */
+  function resolveDeadline(){
+    const raw = (params.get("exp") || "").trim().replace(/[.\/]/g,"-");
+    const m = raw.match(/^(\d{4})-?(\d{2})-?(\d{2})$/);
+    if(m){
+      const iso = m[1] + "-" + m[2] + "-" + m[3] + "T23:59:59+09:00";
+      const t = new Date(iso).getTime();
+      if(!isNaN(t)) return { ts:t, y:+m[1], mo:+m[2], d:+m[3] };
+    }
+    const fb = new Date(CONFIG.deadlineISO);
+    return { ts:fb.getTime(),
+             y:+CONFIG.deadlineISO.slice(0,4),
+             mo:+CONFIG.deadlineISO.slice(5,7),
+             d:+CONFIG.deadlineISO.slice(8,10) };
+  }
+  const DL = resolveDeadline();
+  const WEEKDAYS_KO = ["일","월","화","수","목","금","토"];
+  const expLabel = DL.mo + "/" + DL.d + "(" + WEEKDAYS_KO[new Date(Date.UTC(DL.y, DL.mo-1, DL.d)).getUTCDay()] + ") 23:59까지";
 
   const codeEl  = document.getElementById("code");
   const copyBtn = document.getElementById("copyBtn");
@@ -197,7 +221,7 @@
   // ── 버튼 클릭 기록(선택). CONFIG.logUrl 설정 시에만 동작 ──
   function logEvent(button){
     if(!CONFIG.logUrl) return;
-    const payload = JSON.stringify({ button:button, code:rawCode, ts:new Date().toISOString(), ua:navigator.userAgent });
+    const payload = JSON.stringify({ button:button, code:rawCode, exp:expLabel, ts:new Date().toISOString(), ua:navigator.userAgent });
     try{
       const blob = new Blob([payload], {type:"text/plain;charset=UTF-8"});
       if(navigator.sendBeacon && navigator.sendBeacon(CONFIG.logUrl, blob)) return;   // 페이지 이동 중에도 전송 보장
@@ -207,7 +231,8 @@
   logEvent("page_view");
   goBtn.addEventListener("click", ()=> logEvent("register"));
 
-  const DEADLINE = new Date(CONFIG.deadlineISO).getTime();
+  const DEADLINE = DL.ts;
+  document.getElementById("until").textContent = "유효기간 · " + expLabel + " (한국시간)";
   const pad = n => String(n).padStart(2,"0");
   function tick(){
     let diff = DEADLINE - Date.now();
